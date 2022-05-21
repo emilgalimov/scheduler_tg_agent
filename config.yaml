@@ -1,0 +1,12 @@
+postgres:
+  host: 127.0.0.1
+  port: 5433
+  user: user
+  password: pass
+  database_name: users
+telegram:
+  token: 5119798084:AAEk9jwqEXssd_RhbruJdE6Y_5RMlX4kO18
+smartCalendar:
+  host: 127.0.0.1
+  port: 8080
+
