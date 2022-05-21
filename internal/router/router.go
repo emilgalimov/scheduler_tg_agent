@@ -43,11 +43,17 @@ func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) []t
 			return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка "+err.Error())}
 		}
 		message := tgbotapi.NewMessage(update.Message.Chat.ID, "Успешно")
-		message.ReplyMarkup = tgbotapi.NewReplyKeyboard()
 		return []tgbotapi.Chattable{message}
 
 	case strings.Contains(str, "Отписаться"):
-		r.service.Unsubscribe(ctx, update.Message.Chat.ID, getTaskID(str))
+		err := r.service.Unsubscribe(ctx, update.Message.Chat.ID, getTaskID(str))
+
+		if err != nil {
+			return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка "+err.Error())}
+		}
+		message := tgbotapi.NewMessage(update.Message.Chat.ID, "Успешно")
+		return []tgbotapi.Chattable{message}
+
 	}
 	return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Введите заного")}
 }
