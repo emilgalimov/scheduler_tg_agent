@@ -17,58 +17,73 @@ func NewRouter(service *app.Service) *router {
 	return &router{service: service}
 }
 
-func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) string {
+func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) []tgbotapi.Chattable {
 	switch update.Message.Command() {
 	case "start":
 		r.service.CreateUser(ctx, update.Message.Chat.ID)
-		return "Добро пожаловать"
+		return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Добро пожаловать")}
 	case "all_tasks":
 		list := r.service.TasksList(ctx)
-		return tasksListToTGText(list.Tasks)
+		return tasksListToTGText(update.Message.Chat.ID, list.Tasks)
 	case "my_tasks":
 		r.service.ChatTasks(ctx, update.Message.Chat.ID)
 	}
 
 	str := update.Message.Text
 	switch {
-	case strings.Contains(str, "subscribe"):
-		r.service.Subscribe(ctx, update.Message.Chat.ID, getTaskID(str))
-	case strings.Contains(str, "unsubscribe"):
+	case strings.Contains(str, "Подписаться"):
+		err := r.service.Subscribe(ctx, update.Message.Chat.ID, getTaskID(str))
+		if err != nil {
+			return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка "+err.Error())}
+		}
+		return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Успешно")}
+	case strings.Contains(str, "Отписаться"):
 		r.service.Unsubscribe(ctx, update.Message.Chat.ID, getTaskID(str))
 	}
-	return "error"
+	return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Введите заного")}
 }
 
-func tasksListToTGText(tasks []*api.Task) string {
+func tasksListToTGText(chatId int64, tasks []*api.Task) (messages []tgbotapi.Chattable) {
 
-	var result string
+	var buttons []tgbotapi.KeyboardButton
 
 	for _, task := range tasks {
-		result += "Name: " + task.Name
-		result += "\n"
-		result += "Description: " + task.Description
-		result += "\n\n"
-		result += "Stages\n"
+		var text string
+		text += "ID: " + strconv.FormatUint(task.ID, 10)
+		text += "\n"
+		text += "Name: " + task.Name
+		text += "\n"
+		text += "Description: " + task.Description
+		text += "\n\n"
+		text += "Stages\n"
 
 		for _, taskStage := range task.TaskStages {
-			result += "Name: " + taskStage.Name
-			result += "\n"
-			result += "Description: " + taskStage.Description
-			result += "\n"
-			result += "MinutesFromStart: " + strconv.FormatUint(taskStage.MinutesFromStart, 10)
-			result += "\n"
-			result += "DurationMinutes: " + strconv.FormatUint(taskStage.DurationMinutes, 10)
-			result += "\n\n"
+			text += "Name: " + taskStage.Name
+			text += "\n"
+			text += "Description: " + taskStage.Description
+			text += "\n"
+			text += "MinutesFromStart: " + strconv.FormatUint(taskStage.MinutesFromStart, 10)
+			text += "\n"
+			text += "DurationMinutes: " + strconv.FormatUint(taskStage.DurationMinutes, 10)
+			text += "\n\n"
 		}
+
+		message := tgbotapi.NewMessage(chatId, text)
+		messages = append(messages, message)
+
+		buttons = append(buttons, tgbotapi.NewKeyboardButton("Подписаться "+strconv.FormatUint(task.ID, 10)))
 	}
 
-	return result
+	message := tgbotapi.NewMessage(chatId, "Для подписки выберите ID задачи")
+	message.ReplyMarkup = tgbotapi.NewReplyKeyboard(buttons)
 
+	messages = append(messages, message)
+	return messages
 }
 
 func getTaskID(str string) uint64 {
 	ID, _ := strconv.ParseUint(
-		strings.Split(str, "_")[1],
+		strings.Split(str, " ")[1],
 		0,
 		64,
 	)

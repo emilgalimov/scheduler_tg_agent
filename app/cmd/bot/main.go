@@ -70,14 +70,15 @@ func main() {
 	rt := router.NewRouter(service)
 
 	for update := range updates {
-		answer := rt.ProcessMessage(update, ctx)
+		answers := rt.ProcessMessage(update, ctx)
 
-		msg := tgbotapi.NewMessage(update.Message.Chat.ID, answer)
+		for _, answer := range answers {
+			_, err2 := bot.Send(answer)
 
-		_, err2 := bot.Send(msg)
-
-		if err2 != nil {
-			log.Printf("error send message %v", err2)
+			if err2 != nil {
+				log.Printf("error send message %v", err2)
+			}
 		}
+
 	}
 }
