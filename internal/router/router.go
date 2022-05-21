@@ -22,11 +22,17 @@ func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) []t
 	case "start":
 		r.service.CreateUser(ctx, update.Message.Chat.ID)
 		return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Добро пожаловать")}
+
 	case "all_tasks":
 		list := r.service.TasksList(ctx)
-		return tasksListToTGText(update.Message.Chat.ID, list.Tasks)
+		return tasksListToTGText(update.Message.Chat.ID, list.Tasks, false)
+
 	case "my_tasks":
-		r.service.ChatTasks(ctx, update.Message.Chat.ID)
+		list, err := r.service.ChatTasks(ctx, update.Message.Chat.ID)
+		if err != nil {
+			return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка "+err.Error())}
+		}
+		return tasksListToTGText(update.Message.Chat.ID, list.Tasks, true)
 	}
 
 	str := update.Message.Text
@@ -36,14 +42,17 @@ func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) []t
 		if err != nil {
 			return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка "+err.Error())}
 		}
-		return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Успешно")}
+		message := tgbotapi.NewMessage(update.Message.Chat.ID, "Успешно")
+		message.ReplyMarkup = tgbotapi.NewReplyKeyboard()
+		return []tgbotapi.Chattable{message}
+
 	case strings.Contains(str, "Отписаться"):
 		r.service.Unsubscribe(ctx, update.Message.Chat.ID, getTaskID(str))
 	}
 	return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Введите заного")}
 }
 
-func tasksListToTGText(chatId int64, tasks []*api.Task) (messages []tgbotapi.Chattable) {
+func tasksListToTGText(chatId int64, tasks []*api.Task, isUnsubscribe bool) (messages []tgbotapi.Chattable) {
 
 	var buttons []tgbotapi.KeyboardButton
 
@@ -71,6 +80,10 @@ func tasksListToTGText(chatId int64, tasks []*api.Task) (messages []tgbotapi.Cha
 		message := tgbotapi.NewMessage(chatId, text)
 		messages = append(messages, message)
 
+		if isUnsubscribe {
+			buttons = append(buttons, tgbotapi.NewKeyboardButton("Отписаться "+strconv.FormatUint(task.ID, 10)))
+			continue
+		}
 		buttons = append(buttons, tgbotapi.NewKeyboardButton("Подписаться "+strconv.FormatUint(task.ID, 10)))
 	}
 
