@@ -93,6 +93,10 @@ func tasksListToTGText(chatId int64, tasks []*api.Task, isUnsubscribe bool) (mes
 		buttons = append(buttons, tgbotapi.NewKeyboardButton("Подписаться "+strconv.FormatUint(task.ID, 10)))
 	}
 
+	if len(messages) == 0 {
+		return nil
+	}
+
 	message := tgbotapi.NewMessage(chatId, "Для подписки выберите ID задачи")
 	message.ReplyMarkup = tgbotapi.NewReplyKeyboard(buttons)
 
