@@ -7,6 +7,7 @@ require (
 	github.com/jackc/pgx/v4 v4.16.1
 	gitlab.ozon.dev/emilgalimov/homework-2/pkg/api v0.0.0-20220520221831-17167b8bf5e6
 	google.golang.org/grpc v1.46.2
+	google.golang.org/protobuf v1.28.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -27,5 +28,4 @@ require (
 	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
 )

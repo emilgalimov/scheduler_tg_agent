@@ -25,12 +25,18 @@ func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) []t
 
 	case "all_tasks":
 		list := r.service.TasksList(ctx)
+		if list == nil {
+			return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Введите заново")}
+		}
 		return tasksListToTGText(update.Message.Chat.ID, list.Tasks, false)
 
 	case "my_tasks":
 		list, err := r.service.ChatTasks(ctx, update.Message.Chat.ID)
 		if err != nil {
 			return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка "+err.Error())}
+		}
+		if list == nil {
+			return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Введите заново")}
 		}
 		return tasksListToTGText(update.Message.Chat.ID, list.Tasks, true)
 	}
@@ -55,7 +61,7 @@ func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) []t
 		return []tgbotapi.Chattable{message}
 
 	}
-	return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Введите заного")}
+	return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Введите заново")}
 }
 
 func tasksListToTGText(chatId int64, tasks []*api.Task, isUnsubscribe bool) (messages []tgbotapi.Chattable) {
