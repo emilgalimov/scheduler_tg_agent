@@ -1,4 +1,4 @@
-package task_creator
+package task_stage_creator
 
 import (
 	"context"
@@ -8,17 +8,21 @@ import (
 	"gitlab.ozon.dev/emilgalimov/homework-2_2/internal/model"
 )
 
-const Name = "taskCreator"
+const Name = "taskStageCreator"
 
 type taskCreator struct {
-	startMessage      state
-	createName        state
-	createDescription state
-	final             state
-	currentState      state
+	startMessage           state
+	createTaskID           state
+	createName             state
+	createDescription      state
+	createMinutesFromStart state
+	createDurationMinutes  state
+	final                  state
+
+	currentState state
 
 	activeAction model.ActiveLiveAction
-	data         taskCreatorData
+	data         taskStageCreatorData
 
 	service *app.Service
 }
@@ -26,7 +30,7 @@ type taskCreator struct {
 // NewTaskCreator TODO вынести интерфейс многоступенчатого криейтера
 func NewTaskCreator(activeAction model.ActiveLiveAction, service *app.Service) (*taskCreator, error) {
 
-	var data taskCreatorData
+	var data taskStageCreatorData
 
 	err := json.Unmarshal(activeAction.Data, &data)
 	if err != nil {
@@ -43,6 +47,9 @@ func NewTaskCreator(activeAction model.ActiveLiveAction, service *app.Service) (
 		tc: tc,
 	}
 
+	createTaskID := &createTaskIDState{
+		tc: tc,
+	}
 	createName := &createNameState{
 		tc: tc,
 	}
@@ -51,21 +58,39 @@ func NewTaskCreator(activeAction model.ActiveLiveAction, service *app.Service) (
 		tc: tc,
 	}
 
+	createMinutesFromStart := &createMinutesFromStartState{
+		tc: tc,
+	}
+
+	createDurationMinutes := &createDurationMinutesState{
+		tc: tc,
+	}
+
 	final := &finalState{
 		tc: tc,
 	}
 
 	//TODO привязывать друг к другу как в цепочке событий
+	//TODO вынести вступительное сообщение в следующий статус
+	tc.startMessage = startMessage
+	tc.createTaskID = createTaskID
 	tc.createName = createName
 	tc.createDescription = createDescription
-	tc.startMessage = startMessage
+	tc.createMinutesFromStart = createMinutesFromStart
+	tc.createDurationMinutes = createDurationMinutes
 	tc.final = final
 
 	switch activeAction.State {
+	case "createTaskID":
+		tc.currentState = createTaskID
 	case "createName":
 		tc.currentState = createName
 	case "createDescription":
 		tc.currentState = createDescription
+	case "createMinutesFromStart":
+		tc.currentState = createMinutesFromStart
+	case "createDurationMinutes":
+		tc.currentState = createDurationMinutes
 	case "final":
 		tc.currentState = final
 	default:

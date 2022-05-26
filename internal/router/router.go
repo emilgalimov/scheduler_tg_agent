@@ -6,6 +6,7 @@ import (
 	"gitlab.ozon.dev/emilgalimov/homework-2/pkg/api/v1"
 	"gitlab.ozon.dev/emilgalimov/homework-2_2/internal/app"
 	"gitlab.ozon.dev/emilgalimov/homework-2_2/internal/live_action/task_creator"
+	"gitlab.ozon.dev/emilgalimov/homework-2_2/internal/live_action/task_stage_creator"
 	"gitlab.ozon.dev/emilgalimov/homework-2_2/internal/model"
 	"strconv"
 	"strings"
@@ -27,7 +28,10 @@ func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) []t
 
 	if action, err := r.repo.GetActionByChatID(ctx, update.Message.Chat.ID); err == nil {
 		if action.Name == task_creator.Name {
-			return r.processAction(update, ctx, action)
+			return r.processCreateTaskAction(update, ctx, action)
+		}
+		if action.Name == task_stage_creator.Name {
+			return r.processCreateTaskStageAction(update, ctx, action)
 		}
 	}
 
@@ -54,7 +58,15 @@ func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) []t
 		return tasksListToTGText(update.Message.Chat.ID, list.Tasks, true)
 
 	case "create_task":
-		return r.processAction(
+		return r.processCreateTaskAction(
+			update,
+			ctx,
+			model.ActiveLiveAction{
+				Data:   []byte(`{}`),
+				ChatID: update.Message.Chat.ID,
+			})
+	case "create_task_stage":
+		return r.processCreateTaskStageAction(
 			update,
 			ctx,
 			model.ActiveLiveAction{
@@ -85,8 +97,29 @@ func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) []t
 	return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Введите заново")}
 }
 
-func (r *router) processAction(update tgbotapi.Update, ctx context.Context, action model.ActiveLiveAction) []tgbotapi.Chattable {
+func (r *router) processCreateTaskAction(update tgbotapi.Update, ctx context.Context, action model.ActiveLiveAction) []tgbotapi.Chattable {
 	creator, err := task_creator.NewTaskCreator(action, r.service)
+	if err != nil {
+		return nil
+	}
+
+	returnMessages := creator.Process(ctx, update.Message)
+	newAction := creator.GetCurrentAction()
+
+	if creator.IsFinished() {
+		r.repo.DeleteActionByChatID(ctx, update.Message.Chat.ID)
+		if err != nil {
+			return nil
+		}
+		return returnMessages
+	}
+	r.repo.CreateOrUpdateAction(ctx, newAction)
+
+	return returnMessages
+}
+
+func (r *router) processCreateTaskStageAction(update tgbotapi.Update, ctx context.Context, action model.ActiveLiveAction) []tgbotapi.Chattable {
+	creator, err := task_stage_creator.NewTaskCreator(action, r.service)
 	if err != nil {
 		return nil
 	}
