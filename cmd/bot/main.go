@@ -67,7 +67,7 @@ func main() {
 		log.Panic(err)
 	}
 
-	rt := router.NewRouter(service)
+	rt := router.NewRouter(service, repo)
 
 	for update := range updates {
 		answers := rt.ProcessMessage(update, ctx)

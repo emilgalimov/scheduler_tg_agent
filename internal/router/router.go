@@ -5,19 +5,32 @@ import (
 	"github.com/go-telegram-bot-api/telegram-bot-api"
 	"gitlab.ozon.dev/emilgalimov/homework-2/pkg/api/v1"
 	"gitlab.ozon.dev/emilgalimov/homework-2_2/internal/app"
+	"gitlab.ozon.dev/emilgalimov/homework-2_2/internal/live_action/task_creator"
+	"gitlab.ozon.dev/emilgalimov/homework-2_2/internal/model"
 	"strconv"
 	"strings"
 )
 
 type router struct {
 	service *app.Service
+	repo    Repository
 }
 
-func NewRouter(service *app.Service) *router {
-	return &router{service: service}
+func NewRouter(service *app.Service, repo Repository) *router {
+	return &router{
+		service: service,
+		repo:    repo,
+	}
 }
 
 func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) []tgbotapi.Chattable {
+
+	if action, err := r.repo.GetActionByChatID(ctx, update.Message.Chat.ID); err == nil {
+		if action.Name == task_creator.Name {
+			return r.processAction(update, ctx, action)
+		}
+	}
+
 	switch update.Message.Command() {
 	case "start":
 		r.service.CreateUser(ctx, update.Message.Chat.ID)
@@ -39,6 +52,15 @@ func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) []t
 			return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Введите заново")}
 		}
 		return tasksListToTGText(update.Message.Chat.ID, list.Tasks, true)
+
+	case "create_task":
+		return r.processAction(
+			update,
+			ctx,
+			model.ActiveLiveAction{
+				Data:   []byte(`{}`),
+				ChatID: update.Message.Chat.ID,
+			})
 	}
 
 	str := update.Message.Text
@@ -48,20 +70,40 @@ func (r *router) ProcessMessage(update tgbotapi.Update, ctx context.Context) []t
 		if err != nil {
 			return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка "+err.Error())}
 		}
-		message := tgbotapi.NewMessage(update.Message.Chat.ID, "Успешно")
+		message := tgbotapi.NewMessage(update.Message.Chat.ID, "Вы успешно подписались")
 		return []tgbotapi.Chattable{message}
 
 	case strings.Contains(str, "Отписаться"):
 		err := r.service.Unsubscribe(ctx, update.Message.Chat.ID, getTaskID(str))
-
 		if err != nil {
 			return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Ошибка "+err.Error())}
 		}
-		message := tgbotapi.NewMessage(update.Message.Chat.ID, "Успешно")
+		message := tgbotapi.NewMessage(update.Message.Chat.ID, "Вы успешно отписались")
 		return []tgbotapi.Chattable{message}
 
 	}
 	return []tgbotapi.Chattable{tgbotapi.NewMessage(update.Message.Chat.ID, "Введите заново")}
+}
+
+func (r *router) processAction(update tgbotapi.Update, ctx context.Context, action model.ActiveLiveAction) []tgbotapi.Chattable {
+	creator, err := task_creator.NewTaskCreator(action, r.service)
+	if err != nil {
+		return nil
+	}
+
+	returnMessages := creator.Process(ctx, update.Message)
+	newAction := creator.GetCurrentAction()
+
+	if creator.IsFinished() {
+		r.repo.DeleteActionByChatID(ctx, update.Message.Chat.ID)
+		if err != nil {
+			return nil
+		}
+		return returnMessages
+	}
+	r.repo.CreateOrUpdateAction(ctx, newAction)
+
+	return returnMessages
 }
 
 func tasksListToTGText(chatId int64, tasks []*api.Task, isUnsubscribe bool) (messages []tgbotapi.Chattable) {
